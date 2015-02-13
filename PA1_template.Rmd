@@ -8,18 +8,152 @@ output:
 
 ## Loading and preprocessing the data
 
+First, clean the workspace and load libraries
 
+```{r}
+rm(list=ls())
+library(ggplot2)
+library(chron)
+```
+
+Unzip and load the data
+
+```{r}
+unzip("activity.zip")
+activity <- read.csv("activity.csv")
+```
+
+Now we process the data to filter out NAs and keep only complete cases
+
+```{r}
+activity.complete <- activity[complete.cases(activity),]
+```
 
 ## What is mean total number of steps taken per day?
 
+### 1. Calculate the total number of steps taken per day
 
+First we sum up all the steps per day
+
+```{r}
+total_spd <- aggregate(activity.complete$steps,list(Date=activity.complete$date),sum)
+names(total_spd)<-c("Date", "Steps_per_day")
+```
+
+The following plot shows the frequency of steps per day
+
+```{r}
+ggplot(total_spd, aes(x=total_spd$Steps_per_day)) + geom_histogram(color = "black", fill = "white") + xlab("Steps per day") + ylab("Frequency")+ theme_bw() + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),plot.title=element_text(size=15))
+```
+
+The mean total number of steps per day is:
+```{r}
+round(mean(total_spd$Steps_per_day, na.rm = T), digits = 3)
+```
+
+The median total number of steps per day is:
+```{r}
+round(median(total_spd$Steps_per_day, na.rm = T), digits = 3)
+```
 
 ## What is the average daily activity pattern?
 
+### Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+First we need to average the data attending to the time intervals 
+
+```{r}
+aver_intervals<-aggregate(activity.complete$steps,list(fivemin=activity.complete$interval),mean)
+names(aver_intervals) <- c("fivemin", "aversteps")
+```
+
+Now we can plot the average number of steps in a time series
+
+```{r}
+ggplot(aver_intervals,aes(aver_intervals$fivemin,aver_intervals$aversteps)) +geom_line()  + xlab("Time in 5 min intervals") + ylab("Steps average")+ theme_bw() + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),plot.title=element_text(size=15))
+```
+
+### Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+The maximum number of averaged steps is
+```{r}
+max(aver_intervals$aversteps)
+```
+at the interval: 
+```{r}
+interval<- subset(aver_intervals, aver_intervals$aversteps == max(aver_intervals$aversteps))
+interval$fivemin
+```
 
 
 ## Imputing missing values
+### Calculate and report the total number of missing values in the dataset
+The number of rows with NAs in the dataset is:
 
+```{r}
+nrow(activity[is.na(activity$steps),])
+```
+### Devise a strategy for filling in all of the missing values in the dataset. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+The mean number of steps per day is:
 
+```{r}
+round(mean(activity$steps, na.rm = T))
+```
+We apply this number of steps to the NA cases
+
+```{r}
+activity.fixed <-activity
+for (i in 1:length(activity$steps)) if (is.na(activity$steps[i])) {
+        activity.fixed$steps[i] <- round(mean(activity$steps, na.rm = T))
+}
+```
+### Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day.
+With the fixed activity dataset The following plot shows the frequency of steps per day.
+
+```{r}
+total_spd.fix <- aggregate(activity.fixed$steps,list(Date=activity.fixed$date),sum)
+names(total_spd.fix)<-c("Date", "Steps_per_day")
+ggplot(total_spd.fix, aes(x=total_spd.fix$Steps_per_day)) + geom_histogram(color = "black", fill = "white") + xlab("Steps per day") + ylab("Frequency")+ theme_bw() + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),plot.title=element_text(size=15))
+```
+
+The mean total number of steps per day in the fixed dataset is:
+```{r}
+round(mean(total_spd.fix$Steps_per_day, na.rm = T), digits = 3)
+```
+
+The median total number of steps per day in the fixed dataset is:
+```{r}
+round(median(total_spd.fix$Steps_per_day, na.rm = T), digits = 3)
+```
+
+```{r echo=FALSE}
+a <- round(median(total_spd$Steps_per_day, na.rm = T), digits = 3)
+```
+```{r echo=FALSE}
+b <- round(mean(total_spd$Steps_per_day, na.rm = T), digits = 3)
+```
+
+The median in the original dataset is `r a`. Fixing the dataset changes the median but doesn't changes the mean too much (the original mean was `r b`)
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+weekend<-function(date){
+        if (is.weekend(date)){
+                'weekend'
+        } else {
+                'weekday'
+        }
+}
+
+activity.fixed$day <- as.factor(sapply(activity.fixed$date,weekend))
+```
+
+Plot weekdays vs weekends data
+
+```{r}
+aver_intervals<-aggregate(activity.fixed$steps,list(fivemin=activity.fixed$interval),mean)
+names(aver_intervals) <- c("fivemin", "aversteps")
+
+p<-ggplot(activity.fixed,aes(activity.fixed$interval,activity.fixed$steps)) +geom_line() +  xlab("Time in 5 min intervals") + ylab("Steps")+ theme_bw() + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),plot.title=element_text(size=15))
+p+facet_grid(day ~ .) 
